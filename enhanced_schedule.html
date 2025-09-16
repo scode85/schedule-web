@@ -1,0 +1,207 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lịch Học Động</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 15px;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        h1 {
+            font-size: 1.8em;
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        p#dateTime {
+            font-size: 1em;
+            text-align: center;
+            margin-bottom: 15px;
+            color: #7f8c8d;
+            font-weight: 500;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            font-size: 0.9em;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+            transition: background-color 0.3s;
+        }
+        th {
+            background-color: #3498db;
+            color: #fff;
+            text-transform: uppercase;
+            font-size: 0.95em;
+        }
+        td {
+            color: #2c3e50;
+        }
+        tr:hover td {
+            background-color: #f5f6fa;
+        }
+        .highlight {
+            background-color: #ffeaa7;
+            font-weight: bold;
+        }
+        @media (max-width: 600px) {
+            table {
+                display: block;
+                overflow-x: auto;
+            }
+            th, td {
+                min-width: 120px;
+                padding: 8px;
+            }
+            h1 {
+                font-size: 1.4em;
+            }
+            p#dateTime {
+                font-size: 0.9em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Lịch Học Hôm Nay</h1>
+    <p id="dateTime"></p>
+    <table id="scheduleTable">
+        <tr>
+            <th>Môn học</th>
+            <th>Buổi</th>
+        </tr>
+    </table>
+
+    <script>
+        // Dữ liệu lịch học theo ngày và buổi (dựa trên hình ảnh)
+        const schedule = {
+            'Thứ Hai': {
+                'Sáng': ['Hóa học - T.Nam', 'Tin học - C.HạnhT', 'Ngữ văn - C.Luân'],
+                'Chiều': []
+            },
+            'Thứ Ba': {
+                'Sáng': ['Hóa học - T.Nam', 'Lịch sử - C.Vinh', 'Công nghệ - C.Hà', 'Sinh học - T.Hải'],
+                'Chiều': ['GDQPAN - T.Nguyễn', 'Lịch sử - C.Vinh', 'GDTC - T.Minh']
+            },
+            'Thứ Tư': {
+                'Sáng': ['GDTC - T.Minh', 'Sinh học - T.Hải'],
+                'Chiều': ['GDĐP - C.HạnhS', 'Tiếng Anh - T.Chính', 'Toán học - T.Định']
+            },
+            'Thứ Năm': {
+                'Sáng': ['Sinh học - T.Hải', 'Toán học - T.Định'],
+                'Chiều': ['HD TNNH - T.Hào', 'HD TNNH - T.Hào', 'HD TNNH - T.Hào']
+            },
+            'Thứ Sáu': {
+                'Sáng': ['Hóa học - T.Nam', 'Tin học - C.HạnhT', 'Tiếng Anh - T.Chính', 'Ngữ văn - C.Luân'],
+                'Chiều': []
+            }
+        };
+
+        // Lấy ngày và thời gian hiện tại
+        function updateSchedule() {
+            const now = new Date();
+            const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+            const dayName = days[now.getDay()];
+            const hours = now.getHours();
+            const session = hours < 13 && hours >= 5 ? 'Sáng' : 'Chiều'; // Sáng từ 5h-13h, Chiều từ 13h
+            const dateTimeDisplay = `Hôm nay là: ${dayName}, ${now.toLocaleTimeString('vi-VN')} (${session})`;
+
+            // Cập nhật ngày giờ
+            document.getElementById('dateTime').textContent = dateTimeDisplay;
+
+            // Lấy bảng và xóa nội dung cũ
+            const table = document.getElementById('scheduleTable');
+            table.innerHTML = `
+                <tr>
+                    <th>Môn học</th>
+                    <th>Buổi</th>
+                </tr>
+            `;
+
+            // Hiển thị lịch của ngày hiện tại
+            if (schedule[dayName]) {
+                const currentSchedule = schedule[dayName][session];
+                if (currentSchedule && currentSchedule.length > 0) {
+                    currentSchedule.forEach(subject => {
+                        const row = table.insertRow();
+                        const cell1 = row.insertCell(0);
+                        const cell2 = row.insertCell(1);
+                        cell1.textContent = subject;
+                        cell2.textContent = session;
+                        if (subject) cell1.classList.add('highlight');
+                    });
+                } else {
+                    const row = table.insertRow();
+                    const cell1 = row.insertCell(0);
+                    cell1.colSpan = 2;
+                    cell1.textContent = 'Không có lịch học trong buổi này.';
+                    cell1.classList.add('highlight');
+                }
+            } else {
+                const row = table.insertRow();
+                const cell1 = row.insertCell(0);
+                cell1.colSpan = 2;
+                cell1.textContent = 'Không có dữ liệu lịch học cho ngày này.';
+                cell1.classList.add('highlight');
+            }
+        }
+
+        // Cập nhật lịch khi tải trang và mỗi giây
+        updateSchedule();
+        setInterval(updateSchedule, 1000);
+    </script>
+</body>
+</html>
